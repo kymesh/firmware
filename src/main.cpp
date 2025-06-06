@@ -22,6 +22,10 @@
 #include "error.h"
 #include "power.h"
 
+extern "C" {
+#include "m4fstack/api.h"
+}
+
 #if !MESHTASTIC_EXCLUDE_I2C
 #include "detect/ScanI2CTwoWire.h"
 #include <Wire.h>
@@ -1280,6 +1284,21 @@ void setup()
     LOG_DEBUG("Free heap  : %7d bytes", ESP.getFreeHeap());
     LOG_DEBUG("Free PSRAM : %7d bytes", ESP.getFreePsram());
 #endif
+
+    unsigned char * sk = (unsigned char *)malloc(KYBER_SECRETKEYBYTES);
+    unsigned char * pk = (unsigned char *)malloc(KYBER_PUBLICKEYBYTES);
+
+    unsigned char * ss = (unsigned char *)malloc(KYBER_SSBYTES);
+    unsigned char * ct = (unsigned char *)malloc(KYBER_CIPHERTEXTBYTES);
+
+    uint32_t startTime = millis();
+    int a = crypto_kem_keypair(pk, sk);
+
+    int b = crypto_kem_enc(ct, ss, pk);
+    uint32_t endTime = millis();
+
+    LOG_INFO("Kyber keypair generation took %u ms", endTime - startTime);
+    LOG_INFO("Kyber succeeded %d %d\n", a, b);
 }
 #endif
 uint32_t rebootAtMsec;   // If not zero we will reboot at this time (used to reboot shortly after the update completes)
