@@ -11,7 +11,6 @@
 #define SHA3_384_RATE 104
 #define SHA3_512_RATE 72
 
-
 // Context for incremental API
 typedef struct {
     uint64_t ctx[26];
@@ -82,7 +81,7 @@ void shake128_inc_finalize(shake128incctx *state);
  */
 void shake128_inc_squeeze(uint8_t *output, size_t outlen, shake128incctx *state);
 /* Copy the context of the SHAKE128 XOF */
-void shake128_inc_ctx_clone(shake128incctx* dest, const shake128incctx *src);
+void shake128_inc_ctx_clone(shake128incctx *dest, const shake128incctx *src);
 /* Free the context of the SHAKE128 XOF */
 void shake128_inc_ctx_release(shake128incctx *state);
 
@@ -112,25 +111,21 @@ void shake256_inc_absorb(shake256incctx *state, const uint8_t *input, size_t inl
 /* Prepares for squeeze phase */
 void shake256_inc_finalize(shake256incctx *state);
 
-
-
 /* Squeeze output out of the sponge.
  *
  * Supports being called multiple times
  */
 void shake256_inc_squeeze(uint8_t *output, size_t outlen, shake256incctx *state);
 /* Copy the state */
-void shake256_inc_ctx_clone(shake256incctx* dest, const shake256incctx *src);
+void shake256_inc_ctx_clone(shake256incctx *dest, const shake256incctx *src);
 /* Free the state */
 void shake256_inc_ctx_release(shake256incctx *state);
 
 /* One-stop SHAKE128 call */
-void shake128(uint8_t *output, size_t outlen,
-              const uint8_t *input, size_t inlen);
+void shake128(uint8_t *output, size_t outlen, const uint8_t *input, size_t inlen);
 
 /* One-stop SHAKE256 call */
-void shake256(uint8_t *output, size_t outlen,
-              const uint8_t *input, size_t inlen);
+void shake256(uint8_t *output, size_t outlen, const uint8_t *input, size_t inlen);
 
 /* Initialize the incremental hashing state */
 void sha3_256_inc_init(sha3_256incctx *state);

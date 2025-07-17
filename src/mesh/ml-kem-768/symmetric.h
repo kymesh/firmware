@@ -7,14 +7,12 @@
 
 typedef shake128ctx xof_state;
 
-void kyber_shake128_absorb(xof_state *s,
-        const uint8_t seed[KYBER_SYMBYTES],
-        uint8_t x,
-        uint8_t y);
+void kyber_shake128_absorb(xof_state *s, const uint8_t seed[KYBER_SYMBYTES], uint8_t x, uint8_t y);
 
 void kyber_shake256_prf(uint8_t *out, size_t outlen, const uint8_t key[KYBER_SYMBYTES], uint8_t nonce);
 
-void kyber_shake256_rkprf(uint8_t out[KYBER_SSBYTES], const uint8_t key[KYBER_SYMBYTES], const uint8_t input[KYBER_CIPHERTEXTBYTES]);
+void kyber_shake256_rkprf(uint8_t out[KYBER_SSBYTES], const uint8_t key[KYBER_SYMBYTES],
+                          const uint8_t input[KYBER_CIPHERTEXTBYTES]);
 
 #define XOF_BLOCKBYTES SHAKE128_RATE
 
