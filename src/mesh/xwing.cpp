@@ -4,9 +4,6 @@
 #include <string>
 #include <tuple>
 
-// Not sure I'm even _allowed_ to use this.
-#include <avr/pgmspace.h>
-
 #include <Curve25519.h>
 
 #include "ml-kem-768/api.h"
