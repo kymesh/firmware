@@ -94,64 +94,6 @@ struct XPublicKey {
     std::array<uint8_t, X_PK_BYTES> b;
 };
 
-/**
- * Tests if a generated Curve25519 point is weak.
- *
- * @param k The point to check.
- * @returns zero if k is not weak, one else
- *
- * @note PROGMEM and pgm_read_byte are special. DuckDuckGo them.
- * @note Lovingly ripped from Arduino's crypto library. Please don't sue.
- */
-uint8_t is_weak_point(const uint8_t k[32])
-{
-    // List of weak points from http://cr.yp.to/ecdh.html
-    // That page lists some others but they are variants on these
-    // of the form "point + i * (2^255 - 19)" for i = 0, 1, 2.
-    // Here we mask off the high bit and eval() catches the rest.
-    static const uint8_t points[5][32] PROGMEM = {
-        {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-        {0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-        {0xE0, 0xEB, 0x7A, 0x7C, 0x3B, 0x41, 0xB8, 0xAE, 0x16, 0x56, 0xE3, 0xFA, 0xF1, 0x9F, 0xC4, 0x6A,
-         0xDA, 0x09, 0x8D, 0xEB, 0x9C, 0x32, 0xB1, 0xFD, 0x86, 0x62, 0x05, 0x16, 0x5F, 0x49, 0xB8, 0x00},
-        {0x5F, 0x9C, 0x95, 0xBC, 0xA3, 0x50, 0x8C, 0x24, 0xB1, 0xD0, 0xB1, 0x55, 0x9C, 0x83, 0xEF, 0x5B,
-         0x04, 0x44, 0x5C, 0xC4, 0x58, 0x1C, 0x8E, 0x86, 0xD8, 0x22, 0x4E, 0xDD, 0xD0, 0x9F, 0x11, 0x57},
-        {0xEC, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F}};
-
-    // Check each of the weak points in turn.  We perform the
-    // comparisons carefully so as not to reveal the value of "k"
-    // in the instruction timing.  If "k" is indeed weak then
-    // we still check everything so as not to reveal which
-    // weak point it is.
-    uint8_t result = 0;
-    for (uint8_t posn = 0; posn < 5; ++posn) {
-        const uint8_t *point = points[posn];
-        uint8_t check = (pgm_read_byte(point + 31) ^ k[31]) & 0x7F;
-        for (uint8_t index = 31; index > 0; --index)
-            check |= (pgm_read_byte(point + index - 1) ^ k[index - 1]);
-        result |= (uint8_t)((((uint16_t)0x0100) - check) >> 8);
-    }
-
-    // The "result" variable will be non-zero if there was a match.
-    return result;
-}
-
-// Ensure to pass a valid secret key in
-// Modified from
-// https://github.com/kostko/arduino-crypto/blob/0e609138d59095d80de0300b3a72803c3462e5ce/Curve25519.cpp#L244
-void X25519(XPublicKey &pk, XSecretKey &sk)
-{
-    do {
-        sk.b.data()[0] &= 0xF8;
-        sk.b.data()[31] = (sk.b.data()[31] & 0x7F) | 0x40;
-
-        Curve25519::eval(pk.b.data(), sk.b.data(), 0);
-    } while (is_weak_point(pk.b.data()));
-}
-
 // std::chappal
 std::tuple<MSecretKey, XSecretKey, MPublicKey, MSecretKey> expand_decapsulation_key(const XWingSecretKey &sk)
 {
@@ -166,6 +108,9 @@ std::tuple<MSecretKey, XSecretKey, MPublicKey, MSecretKey> expand_decapsulation_
     indcpa_keypair_derand(m_pk.b.data(), m_sk.b.data(), expanded.data());
     // Take from start + 64 bytes of expanded data
     memcpy(x_sk.b.data(), expanded.data() + 64, 32);
+    // Pass 0 to represent X25519_BASE
+    // VERIFY
+    Curve25519::eval(x_pk.b.data(), x_sk.b.data(), 0);
 
-    return {};
+    return {m_sk, x_sk, m_pk, m_sk};
 }
