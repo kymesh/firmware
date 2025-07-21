@@ -52,7 +52,6 @@ const char *XWING_LABEL = "\\.//^\\";
 #define X_CT_BYTES 32
 #define X_SS_BYTES 32
 
-// Names are opaque since they are directly from ml-kem-768 implementation.
 #define M_SK_BYTES 2400
 #define M_PK_BYTES 1184
 #define M_CT_BYTES 1088
