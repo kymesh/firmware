@@ -21,6 +21,7 @@
 #include "detect/ScanI2C.h"
 #include "error.h"
 #include "power.h"
+#include <RNG.h>
 
 #if !MESHTASTIC_EXCLUDE_I2C
 #include "detect/ScanI2CTwoWire.h"
@@ -1531,6 +1532,9 @@ void loop()
 #endif
 
     service->loop();
+
+    /* Seed the RNG with registered entropy sources */
+    RNG.loop();
 
     long delayMsec = mainController.runOrDelay();
 
