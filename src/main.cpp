@@ -53,6 +53,7 @@ NimbleBluetooth *nimbleBluetooth = nullptr;
 
 #ifdef ARCH_NRF52
 #include "NRF52Bluetooth.h"
+#include <Adafruit_nRFCrypto.h>
 NRF52Bluetooth *nrf52Bluetooth = nullptr;
 #endif
 
@@ -285,6 +286,28 @@ void lateInitVariant() {}
 /**
  * Print info as a structured log message (for automated log processing)
  */
+void initializeRNG()
+{
+    /* Initialize with application tag */
+    RNG.begin(optstr(APP_VERSION));
+
+    /* Add MAC address as startup entropy source */
+    uint8_t mac[6];
+    getMacAddr(mac);
+    RNG.stir(mac, sizeof(mac));
+
+#ifdef ARCH_NRF52
+    /* Use nRF52 hardware RNG */
+    uint8_t hwEntropy[32];
+    nRFCrypto.begin();
+    nRFCrypto.Random.generate(hwEntropy, sizeof(hwEntropy));
+    RNG.stir(hwEntropy, sizeof(hwEntropy));
+    nRFCrypto.end();
+#endif
+
+    LOG_DEBUG("RNG initialized with platform entropy");
+}
+
 void printInfo()
 {
     LOG_INFO("S:B:%d,%s,%s,%s", HW_VENDOR, optstr(APP_VERSION), optstr(APP_ENV), optstr(APP_REPO));
@@ -715,6 +738,8 @@ void setup()
 #ifdef ARCH_RP2040
     rp2040Setup();
 #endif
+
+    initializeRNG();
 
     // We do this as early as possible because this loads preferences from flash
     // but we need to do this after main cpu init (esp32setup), because we need the random seed set
