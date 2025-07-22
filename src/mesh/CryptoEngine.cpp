@@ -11,9 +11,6 @@
 #include <RNG.h>
 #include <SHA256.h>
 #if !(MESHTASTIC_EXCLUDE_PKI_KEYGEN)
-#if !defined(ARCH_STM32WL)
-#define CryptRNG RNG
-#endif
 
 /**
  * Create a public/private key pair with Curve25519.
