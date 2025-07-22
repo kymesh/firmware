@@ -48,7 +48,7 @@ bool CryptoEngine::regeneratePublicKey(uint8_t *pubKey, uint8_t *privKey)
     if (!memfll(privKey, 0, sizeof(private_key))) {
         Curve25519::eval(pubKey, privKey, 0);
         if (Curve25519::isWeakPoint(pubKey)) {
-            LOG_ERROR("PKI key generation failed. Specified private key results in a weak");
+            LOG_ERROR("PKI key generation failed. Specified private key results in a weak key");
             memset(pubKey, 0, 32);
             return false;
         }
