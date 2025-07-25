@@ -14,6 +14,20 @@
 const char *XWING_LABEL = "\.//^\\";
 
 /**
+ * The following schematic is recreated from the FIPS-203 definition for a simplified
+ * key establishment process. The left boxes (KeyGen, Decaps) are implied to be Alice's
+ * and the right box (Encaps) is implied to be Bob's. The encapsulation key is the public
+ * key for this scheme, whereas the decapsulation key is the private key.
+ *
+ * In effect, Alice will generate both, pass the encapsulation key to parties looking to
+ * establish shared keying material, and then receive some the ciphertext of this shared
+ * keying material. Upon receiving, it will decapsulate it (decrypt), then using this
+ * shared keying material in a symmetric scheme.
+ *
+ * In this specific file, we implement X-Wing (as of its 8th revision), which is a KEM that
+ * uses a so-called 'belt and suspenders' approach to combine the use of X25519 (a well studied
+ * but non-quantum-resistant elliptic curve algorithm) and ML-KEM-768 (a quantum resistant KEM).
+ *
  * ┌──────────────────────┐
  * │                      │
  * │        KeyGen        │
