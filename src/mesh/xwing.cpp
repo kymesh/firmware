@@ -13,6 +13,8 @@
 
 #include "xwing.h"
 
+const char *XWING_LABEL = "\.//^\\";
+
 /**
  * ┌──────────────────────┐
  * │                      │
@@ -116,20 +118,51 @@ std::tuple<XWingSharedSecret, XWingCipherText> encapsulate(const XWingPublicKey 
     XWingCipherText xwing_ct;
     std::array<uint8_t, 32> ek_x;
 
-    std::copy(xwing_pk.b.begin(), xwing_pk.b.begin() + 1184, m_pk.b.begin());
-    std::copy(xwing_pk.b.begin() + 1184, xwing_pk.b.begin() + 1216, x_pk.b.begin());
+    std::copy(xwing_pk.b.begin(), xwing_pk.b.begin() + M_PK_BYTES, m_pk.b.begin());
+    std::copy(xwing_pk.b.begin() + M_PK_BYTES, xwing_pk.b.begin() + M_PK_BYTES + X_PK_BYTES, x_pk.b.begin());
 
     /* Sample from the on-device entropy source */
     randombytes(ek_x.data(), 32);
 
     /* As before, setting the second point to nullptr uses X22519_BASE implicity */
-    Curve25519::eval(x_ct.b.data(), x_ek.data(), nullptr);
-    Curve25519::eval(x_ss.b.data(), x_ek.data(), x_pk.b.data());
+    Curve25519::eval(x_ct.b.data(), ek_x.data(), nullptr);
+    Curve25519::eval(x_ss.b.data(), ek_x.data(), x_pk.b.data());
 
-    std::tie(m_ss)
+    crypto_kem_enc(m_ct.b.data(), m_ss.b.data(), m_pk.b.data());
+
+    xwing_ss = combiner(m_ss, x_ss, x_ct, x_pk);
+
+    /* Concat operation */
+    auto it = std::copy(m_ct.b.begin(), m_ct.b.end(), xwing_ct.b.begin());
+    std::copy(x_ct.b.begin(), x_ct.b.end(), it);
+
+    return {xwing_ss, xwing_ct};
 }
 
-// START OPTIONAL PIECES
+XWingSharedSecret decapsulate(const XWingCipherText &xwing_ct, const XWingSecretKey &xwing_sk)
+{
+    MSecretKey m_sk;
+    XSecretKey x_sk;
+    MPublicKey m_pk;
+    XPublicKey x_pk;
+    MCipherText m_ct;
+    XCipherText x_ct;
+    MSharedSecret m_ss;
+    XSharedSecret x_ss;
+
+    std::tie(m_sk, x_sk, m_pk, x_pk) = expand_decapsulation_key(xwing_sk);
+
+    std::copy(xwing_ct.b.begin(), xwing_ct.b.begin() + M_CT_BYTES, m_ct.b.begin());
+    std::copy(xwing_ct.b.begin() + M_CT_BYTES, xwing_ct.b.begin() + M_CT_BYTES + X_CT_BYTES, x_ct.b.begin());
+
+    crypto_kem_dec(m_ss.b.data(), m_ct.b.data(), m_sk.b.data());
+
+    Curve25519::eval(x_ss.b.data(), x_sk.b.data(), x_ct.b.data());
+
+    return combiner(m_ss, x_ss, x_ct, x_pk);
+}
+
+/* Optional: for testing */
 std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair_derand(const XWingSecretKey &xwing_sk)
 {
     XWingPublicKey xwing_pk;
@@ -146,4 +179,4 @@ std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair_derand(const XWingS
     return {xwing_sk, xwing_pk};
 }
 
-// END OPTIONAL PIECES
+/* Note that we do not provide encapsulate_derand */

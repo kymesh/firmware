@@ -12,7 +12,7 @@
 #include <string>
 #include <tuple>
 
-const char *XWING_LABEL = "\\.//^\\";
+extern const char *XWING_LABEL;
 constexpr size_t XWING_LABEL_BYTES = 6;
 
 constexpr size_t X_SK_BYTES = 32;
@@ -39,6 +39,10 @@ struct MPublicKey {
 
 struct MSharedSecret {
     std::array<uint8_t, M_SS_BYTES> b{};
+};
+
+struct MCipherText {
+    std::array<uint8_t, M_CT_BYTES> b{};
 };
 
 struct XWingSecretKey {
