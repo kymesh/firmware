@@ -1,53 +1,69 @@
 #include "verify.h"
-
+#include "compat.h"
+#include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 /*************************************************
- * Name:        verify
+ * Name:        PQCLEAN_MLKEM768_CLEAN_verify
  *
  * Description: Compare two arrays for equality in constant time.
  *
- * Arguments:   const unsigned char *a: pointer to first byte array
- *              const unsigned char *b: pointer to second byte array
- *              size_t len:             length of the byte arrays
+ * Arguments:   const uint8_t *a: pointer to first byte array
+ *              const uint8_t *b: pointer to second byte array
+ *              size_t len:       length of the byte arrays
  *
  * Returns 0 if the byte arrays are equal, 1 otherwise
  **************************************************/
-unsigned char verify(const unsigned char *a, const unsigned char *b, size_t len)
+int PQCLEAN_MLKEM768_CLEAN_verify(const uint8_t *a, const uint8_t *b, size_t len)
 {
-    uint64_t r;
     size_t i;
+    uint8_t r = 0;
 
-    r = 0;
     for (i = 0; i < len; i++) {
         r |= a[i] ^ b[i];
     }
 
-    r = (~r + 1); // Two's complement
-    r >>= 63;
-    return (unsigned char)r;
+    return (-(uint64_t)r) >> 63;
 }
 
 /*************************************************
- * Name:        cmov
+ * Name:        PQCLEAN_MLKEM768_CLEAN_cmov
  *
  * Description: Copy len bytes from x to r if b is 1;
  *              don't modify x if b is 0. Requires b to be in {0,1};
  *              assumes two's complement representation of negative integers.
  *              Runs in constant time.
  *
- * Arguments:   unsigned char *r:       pointer to output byte array
- *              const unsigned char *x: pointer to input byte array
- *              size_t len:             Amount of bytes to be copied
- *              unsigned char b:        Condition bit; has to be in {0,1}
+ * Arguments:   uint8_t *r:       pointer to output byte array
+ *              const uint8_t *x: pointer to input byte array
+ *              size_t len:       Amount of bytes to be copied
+ *              uint8_t b:        Condition bit; has to be in {0,1}
  **************************************************/
-void cmov(unsigned char *r, const unsigned char *x, size_t len, unsigned char b)
+void PQCLEAN_MLKEM768_CLEAN_cmov(uint8_t *r, const uint8_t *x, size_t len, uint8_t b)
 {
     size_t i;
 
+    PQCLEAN_PREVENT_BRANCH_HACK(b);
+
     b = -b;
     for (i = 0; i < len; i++) {
-        r[i] ^= b & (x[i] ^ r[i]);
+        r[i] ^= b & (r[i] ^ x[i]);
     }
+}
+
+/*************************************************
+ * Name:        PQCLEAN_MLKEM768_CLEAN_cmov_int16
+ *
+ * Description: Copy input v to *r if b is 1, don't modify *r if b is 0.
+ *              Requires b to be in {0,1};
+ *              Runs in constant time.
+ *
+ * Arguments:   int16_t *r:       pointer to output int16_t
+ *              int16_t v:        input int16_t
+ *              uint8_t b:        Condition bit; has to be in {0,1}
+ **************************************************/
+void PQCLEAN_MLKEM768_CLEAN_cmov_int16(int16_t *r, int16_t v, uint16_t b)
+{
+    b = -b;
+    *r ^= b & ((*r) ^ v);
 }

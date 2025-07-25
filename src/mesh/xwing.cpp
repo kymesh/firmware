@@ -11,7 +11,7 @@
 #include "ml-kem-768/randombytes.h"
 #include "xwing.h"
 
-const char *XWING_LABEL = "\.//^\\";
+const char *XWING_LABEL = "\\.//^\\";
 
 /**
  * The following schematic is recreated from the FIPS-203 definition for a simplified
@@ -73,7 +73,7 @@ std::tuple<MSecretKey, XSecretKey, MPublicKey, XPublicKey> expand_decapsulation_
 
     shake256(expanded.data(), 96, sk.b.data(), XWING_SK_BYTES);
     /* Implicitly reads 64 bytes from expanded */
-    indcpa_keypair_derand(m_pk.b.data(), m_sk.b.data(), expanded.data());
+    PQCLEAN_MLKEM768_CLEAN_indcpa_keypair_derand(m_pk.b.data(), m_sk.b.data(), expanded.data());
     /* Read 32 bytes from offsets 64 to 96 */
     std::copy(expanded.begin() + 64, expanded.end(), x_sk.b.begin());
     /* When given nullptr, `eval` uses the X25519 base point on the elliptic curve */
@@ -180,7 +180,7 @@ std::tuple<XWingSharedSecret, XWingCipherText> encapsulate(const XWingPublicKey 
     Curve25519::eval(x_ct.b.data(), ek_x.data(), nullptr);
     Curve25519::eval(x_ss.b.data(), ek_x.data(), x_pk.b.data());
 
-    crypto_kem_enc(m_ct.b.data(), m_ss.b.data(), m_pk.b.data());
+    PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc(m_ct.b.data(), m_ss.b.data(), m_pk.b.data());
 
     xwing_ss = combiner(m_ss, x_ss, x_ct, x_pk);
 
@@ -221,7 +221,7 @@ XWingSharedSecret decapsulate(const XWingCipherText &xwing_ct, const XWingSecret
     std::copy(xwing_ct.b.begin(), xwing_ct.b.begin() + M_CT_BYTES, m_ct.b.begin());
     std::copy(xwing_ct.b.begin() + M_CT_BYTES, xwing_ct.b.begin() + M_CT_BYTES + X_CT_BYTES, x_ct.b.begin());
 
-    crypto_kem_dec(m_ss.b.data(), m_ct.b.data(), m_sk.b.data());
+    PQCLEAN_MLKEM768_CLEAN_crypto_kem_dec(m_ss.b.data(), m_ct.b.data(), m_sk.b.data());
 
     Curve25519::eval(x_ss.b.data(), x_sk.b.data(), x_ct.b.data());
 

@@ -1,11 +1,14 @@
-#ifndef NTT_H
-#define NTT_H
-
+#ifndef PQCLEAN_MLKEM768_CLEAN_NTT_H
+#define PQCLEAN_MLKEM768_CLEAN_NTT_H
+#include "params.h"
 #include <stdint.h>
 
-extern const int32_t zetas[64];
+extern const int16_t PQCLEAN_MLKEM768_CLEAN_zetas[128];
 
-void ntt(int16_t *poly);
-void invntt(int16_t *poly);
+void PQCLEAN_MLKEM768_CLEAN_ntt(int16_t r[256]);
+
+void PQCLEAN_MLKEM768_CLEAN_invntt(int16_t r[256]);
+
+void PQCLEAN_MLKEM768_CLEAN_basemul(int16_t r[2], const int16_t a[2], const int16_t b[2], int16_t zeta);
 
 #endif

@@ -1,13 +1,18 @@
-#ifndef INDCPA_H
-#define INDCPA_H
+#ifndef PQCLEAN_MLKEM768_CLEAN_INDCPA_H
+#define PQCLEAN_MLKEM768_CLEAN_INDCPA_H
+#include "params.h"
+#include "polyvec.h"
+#include <stdint.h>
 
-void indcpa_keypair_derand(unsigned char *pk, unsigned char *sk, const unsigned char *coins);
+void PQCLEAN_MLKEM768_CLEAN_gen_matrix(polyvec *a, const uint8_t seed[KYBER_SYMBYTES], int transposed);
 
-void indcpa_enc(unsigned char *c, const unsigned char *m, const unsigned char *pk, const unsigned char *coins);
+void PQCLEAN_MLKEM768_CLEAN_indcpa_keypair_derand(uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES],
+                                                  uint8_t sk[KYBER_INDCPA_SECRETKEYBYTES], const uint8_t coins[KYBER_SYMBYTES]);
 
-unsigned char indcpa_enc_cmp(const unsigned char *ct, const unsigned char *m, const unsigned char *pk,
-                             const unsigned char *coins);
+void PQCLEAN_MLKEM768_CLEAN_indcpa_enc(uint8_t c[KYBER_INDCPA_BYTES], const uint8_t m[KYBER_INDCPA_MSGBYTES],
+                                       const uint8_t pk[KYBER_INDCPA_PUBLICKEYBYTES], const uint8_t coins[KYBER_SYMBYTES]);
 
-void indcpa_dec(unsigned char *m, const unsigned char *c, const unsigned char *sk);
+void PQCLEAN_MLKEM768_CLEAN_indcpa_dec(uint8_t m[KYBER_INDCPA_MSGBYTES], const uint8_t c[KYBER_INDCPA_BYTES],
+                                       const uint8_t sk[KYBER_INDCPA_SECRETKEYBYTES]);
 
 #endif
