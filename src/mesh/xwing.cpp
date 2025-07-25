@@ -2,15 +2,13 @@
 /* https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-08.html */
 /* Aiden Fox Ivey (c) 2025 */
 
-#include <algorithm>
-
 #include <Curve25519.h>
+#include <algorithm>
 
 #include "ml-kem-768/api.h"
 #include "ml-kem-768/fips202.h"
 #include "ml-kem-768/indcpa.h"
 #include "ml-kem-768/randombytes.h"
-
 #include "xwing.h"
 
 const char *XWING_LABEL = "\.//^\\";
@@ -70,6 +68,16 @@ std::tuple<MSecretKey, XSecretKey, MPublicKey, XPublicKey> expand_decapsulation_
     return {m_sk, x_sk, m_pk, x_pk};
 }
 
+/**
+ * Generates an XWING key pair using secure random bytes.
+ *
+ * This function creates both secret and public keys for the XWING KEM by:
+ * 1. Generating 32 random bytes for the secret key seed
+ * 2. Expanding the seed into ML-KEM-768 and X25519 key pairs
+ * 3. Combining the public keys into a single XWING public key
+ *
+ * @return A tuple containing (secret_key, public_key) for XWING operations
+ */
 std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair(void)
 {
     XWingSecretKey xwing_sk;
@@ -88,6 +96,23 @@ std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair(void)
     return {xwing_sk, xwing_pk};
 }
 
+/**
+ * Combines ML-KEM-768 and X25519 shared secrets with domain separation.
+ *
+ * This function implements the XWING combiner that creates the final shared secret by:
+ * 1. Concatenating ML-KEM shared secret, X25519 shared secret, X25519 ciphertext, and X25519 public key
+ * 2. Appending the XWING domain separation label
+ * 3. Hashing the combined data with SHA3-256 to produce the final shared secret
+ *
+ * The domain separation ensures that XWING shared secrets are distinct from
+ * either ML-KEM-768 or X25519 alone, providing hybrid security.
+ *
+ * @param m_ss ML-KEM-768 shared secret
+ * @param x_ss X25519 shared secret
+ * @param x_ct X25519 ciphertext
+ * @param x_pk X25519 public key
+ * @return The final XWING shared secret
+ */
 XWingSharedSecret combiner(const MSharedSecret &m_ss, const XSharedSecret &x_ss, const XCipherText &x_ct, const XPublicKey &x_pk)
 {
     XWingSharedSecret xwing_ss;
@@ -106,6 +131,19 @@ XWingSharedSecret combiner(const MSharedSecret &m_ss, const XSharedSecret &x_ss,
     return xwing_ss;
 }
 
+/**
+ * Encapsulates a shared secret using an XWING public key.
+ *
+ * This function performs XWING encapsulation by:
+ * 1. Splitting the public key into ML-KEM-768 and X25519 components
+ * 2. Generating ephemeral X25519 key pair from random bytes
+ * 3. Computing X25519 shared secret and ciphertext
+ * 4. Performing ML-KEM-768 encapsulation
+ * 5. Combining both shared secrets using the domain separator
+ *
+ * @param xwing_pk The XWING public key to encapsulate against
+ * @return A tuple containing (shared_secret, ciphertext) for the recipient
+ */
 std::tuple<XWingSharedSecret, XWingCipherText> encapsulate(const XWingPublicKey &xwing_pk)
 {
     MPublicKey m_pk;
@@ -139,6 +177,20 @@ std::tuple<XWingSharedSecret, XWingCipherText> encapsulate(const XWingPublicKey 
     return {xwing_ss, xwing_ct};
 }
 
+/**
+ * Decapsulates a shared secret using an XWING secret key and ciphertext.
+ *
+ * This function performs XWING decapsulation by:
+ * 1. Expanding the secret key into ML-KEM-768 and X25519 key pairs
+ * 2. Splitting the ciphertext into ML-KEM-768 and X25519 components
+ * 3. Performing ML-KEM-768 decapsulation to recover shared secret
+ * 4. Computing X25519 shared secret from secret key and ciphertext
+ * 5. Combining both shared secrets using the domain separator
+ *
+ * @param xwing_ct The XWING ciphertext to decapsulate
+ * @param xwing_sk The XWING secret key for decapsulation
+ * @return The shared secret that matches the encapsulator's output
+ */
 XWingSharedSecret decapsulate(const XWingCipherText &xwing_ct, const XWingSecretKey &xwing_sk)
 {
     MSecretKey m_sk;
@@ -162,7 +214,19 @@ XWingSharedSecret decapsulate(const XWingCipherText &xwing_ct, const XWingSecret
     return combiner(m_ss, x_ss, x_ct, x_pk);
 }
 
-/* Optional: for testing */
+/**
+ * Generates an XWING key pair deterministically from a given secret key seed.
+ *
+ * This function is intended for testing purposes and creates reproducible key pairs
+ * by using a provided secret key seed instead of random bytes. The process is identical
+ * to generate_key_pair() except it skips the random byte generation step.
+ *
+ * WARNING: This function should only be used for testing. Production code should
+ * use generate_key_pair() which provides proper entropy.
+ *
+ * @param xwing_sk The 32-byte secret key seed to use for key generation
+ * @return A tuple containing (secret_key, public_key) derived from the seed
+ */
 std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair_derand(const XWingSecretKey &xwing_sk)
 {
     XWingPublicKey xwing_pk;
