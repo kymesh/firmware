@@ -1,85 +1,81 @@
-/* A C++-11 (Arduino compliant) implementation of XWING. */
+/* A C-style implementation of XWING. */
 /* https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-08.html */
 /* Aiden Fox Ivey (c) 2025 */
 
 #pragma once
 
-#include <array>
 #include <cstdint>
-#include <string>
-#include <tuple>
 
-namespace XWing
-{
-extern const char *XWING_LABEL;
-constexpr size_t XWING_LABEL_BYTES = 6;
-constexpr size_t X_SK_BYTES = 32;
-constexpr size_t X_PK_BYTES = 32;
-constexpr size_t X_CT_BYTES = 32;
-constexpr size_t X_SS_BYTES = 32;
-constexpr size_t M_SK_BYTES = 2400;
-constexpr size_t M_PK_BYTES = 1184;
-constexpr size_t M_CT_BYTES = 1088;
-constexpr size_t M_SS_BYTES = 32;
-constexpr size_t XWING_SK_BYTES = 32;
-constexpr size_t XWING_PK_BYTES = 1216;
-constexpr size_t XWING_CT_BYTES = 1120;
-constexpr size_t XWING_SS_BYTES = 32;
-constexpr size_t COMBINED_BYTES = (M_SS_BYTES + X_SS_BYTES + X_CT_BYTES + X_PK_BYTES + XWING_LABEL_BYTES);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-struct MSecretKey {
-    std::array<uint8_t, M_SK_BYTES> b{};
-};
+/* XWing constants */
+#define XWING_LABEL_BYTES 6
+#define X_SK_BYTES 32
+#define X_PK_BYTES 32
+#define X_CT_BYTES 32
+#define X_SS_BYTES 32
+#define M_SK_BYTES 2400
+#define M_PK_BYTES 1184
+#define M_CT_BYTES 1088
+#define M_SS_BYTES 32
+#define XWING_SK_BYTES 32
+#define XWING_PK_BYTES 1216
+#define XWING_CT_BYTES 1120
+#define XWING_SS_BYTES 32
+#define COMBINED_BYTES (M_SS_BYTES + X_SS_BYTES + X_CT_BYTES + X_PK_BYTES + XWING_LABEL_BYTES)
 
-struct MPublicKey {
-    std::array<uint8_t, M_PK_BYTES> b{};
-};
+/* Core XWing functions - all use raw byte arrays */
 
-struct MSharedSecret {
-    std::array<uint8_t, M_SS_BYTES> b{};
-};
+/**
+ * Generate an XWing keypair
+ * @param secret_key Output buffer for secret key (XWING_SK_BYTES)
+ * @param public_key Output buffer for public key (XWING_PK_BYTES)
+ * @return 0 on success, -1 on failure
+ */
+int xwing_generate_keypair(uint8_t *secret_key, uint8_t *public_key);
 
-struct MCipherText {
-    std::array<uint8_t, M_CT_BYTES> b{};
-};
+/**
+ * Generate an XWing keypair deterministically from seed
+ * @param secret_key Input seed and output buffer for secret key (XWING_SK_BYTES)
+ * @param public_key Output buffer for public key (XWING_PK_BYTES)
+ * @return 0 on success, -1 on failure
+ */
+int xwing_generate_keypair_derand(uint8_t *secret_key, uint8_t *public_key);
 
-struct XWingSecretKey {
-    std::array<uint8_t, XWING_SK_BYTES> b{};
-};
+/**
+ * Encapsulate a shared secret
+ * @param ciphertext Output buffer for ciphertext (XWING_CT_BYTES)
+ * @param shared_secret Output buffer for shared secret (XWING_SS_BYTES)
+ * @param public_key Input public key (XWING_PK_BYTES)
+ * @return 0 on success, -1 on failure
+ */
+int xwing_encapsulate(uint8_t *ciphertext, uint8_t *shared_secret, const uint8_t *public_key);
 
-struct XWingPublicKey {
-    std::array<uint8_t, XWING_PK_BYTES> b{};
-};
+/**
+ * Encapsulate a shared secret deterministically
+ * @param ciphertext Output buffer for ciphertext (XWING_CT_BYTES)
+ * @param shared_secret Output buffer for shared secret (XWING_SS_BYTES)
+ * @param public_key Input public key (XWING_PK_BYTES)
+ * @param eseed Input entropy seed (64 bytes)
+ * @return 0 on success, -1 on failure
+ */
+int xwing_encapsulate_derand(uint8_t *ciphertext, uint8_t *shared_secret, const uint8_t *public_key, const uint8_t *eseed);
 
-struct XWingSharedSecret {
-    std::array<uint8_t, XWING_SS_BYTES> b{};
-};
+/**
+ * Decapsulate a shared secret
+ * @param shared_secret Output buffer for shared secret (XWING_SS_BYTES)
+ * @param ciphertext Input ciphertext (XWING_CT_BYTES)
+ * @param secret_key Input secret key (XWING_SK_BYTES)
+ * @return 0 on success, -1 on failure
+ */
+int xwing_decapsulate(uint8_t *shared_secret, const uint8_t *ciphertext, const uint8_t *secret_key);
 
-struct XWingCipherText {
-    std::array<uint8_t, XWING_CT_BYTES> b{};
-};
+/* Helper functions */
+void xwing_expand_decapsulation_key(const uint8_t *sk, uint8_t *m_sk, uint8_t *x_sk, uint8_t *m_pk, uint8_t *x_pk);
+void xwing_combiner(uint8_t *xwing_ss, const uint8_t *m_ss, const uint8_t *x_ss, const uint8_t *x_ct, const uint8_t *x_pk);
 
-struct XSecretKey {
-    std::array<uint8_t, X_SK_BYTES> b{};
-};
-
-struct XPublicKey {
-    std::array<uint8_t, X_PK_BYTES> b{};
-};
-
-struct XSharedSecret {
-    std::array<uint8_t, X_SS_BYTES> b{};
-};
-
-struct XCipherText {
-    std::array<uint8_t, X_CT_BYTES> b{};
-};
-
-std::tuple<MSecretKey, XSecretKey, MPublicKey, XPublicKey> expand_decapsulation_key(const XWingSecretKey &sk);
-std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair(void);
-XWingSharedSecret combiner(const MSharedSecret &m_ss, const XSharedSecret &x_ss, const XCipherText &x_ct, const XPublicKey &x_pk);
-std::tuple<XWingSharedSecret, XWingCipherText> encapsulate(const XWingPublicKey &xwing_pk);
-XWingSharedSecret decapsulate(const XWingCipherText &xwing_ct, const XWingSecretKey &xwing_sk);
-std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair_derand(const XWingSecretKey &xwing_sk);
-std::tuple<XWingSharedSecret, XWingCipherText> encapsulate_derand(const XWingPublicKey &xwing_pk, std::array<uint8_t, 64> &eseed);
-} // namespace XWing
+#ifdef __cplusplus
+}
+#endif

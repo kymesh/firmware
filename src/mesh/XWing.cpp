@@ -1,9 +1,10 @@
-/* A C++-11 (Arduino compliant) implementation of XWING. */
+/* A C-style implementation of XWING. */
 /* https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-08.html */
 /* Aiden Fox Ivey (c) 2025 */
 
 #include <Curve25519.h>
-#include <algorithm>
+#include <cstdlib>
+#include <cstring>
 
 #include "XWing.h"
 
@@ -13,231 +14,287 @@ extern "C" {
 #include "ml-kem-768/randombytes.h"
 }
 
-namespace XWing
-{
-const char *XWING_LABEL = "\\.//^\\";
+static const char XWING_LABEL[] = "\\.//^\\";
 
 /**
  * Expand an XWING decapsulation key `sk` into its corresponding ML-KEM-768 and
  * X25519 keypairs.
  */
-std::tuple<MSecretKey, XSecretKey, MPublicKey, XPublicKey> expand_decapsulation_key(const XWingSecretKey &sk)
+void xwing_expand_decapsulation_key(const uint8_t *sk, uint8_t *m_sk, uint8_t *x_sk, uint8_t *m_pk, uint8_t *x_pk)
 {
-    std::array<uint8_t, 96> expanded;
-    XSecretKey x_sk;
-    XPublicKey x_pk;
-    MSecretKey m_sk;
-    MPublicKey m_pk;
+    uint8_t *expanded = (uint8_t *)malloc(96);
+    if (!expanded)
+        return; // Handle malloc failure
 
-    shake256(expanded.data(), 96, sk.b.data(), XWING_SK_BYTES);
+    shake256(expanded, 96, sk, XWING_SK_BYTES);
+
     /* Use first 64 bytes for ML-KEM-768 key generation */
-    PQCLEAN_MLKEM768_CLEAN_crypto_kem_keypair_derand(m_pk.b.data(), m_sk.b.data(), expanded.data());
+    PQCLEAN_MLKEM768_CLEAN_crypto_kem_keypair_derand(m_pk, m_sk, expanded);
+
     /* Read 32 bytes from offsets 64 to 96 */
-    std::copy(expanded.begin() + 64, expanded.end(), x_sk.b.begin());
+    memcpy(x_sk, expanded + 64, 32);
 
     /* https://www.rfc-editor.org/rfc/rfc7748.html */
     /* Apply X25519 scalar clamping as per RFC 7748 */
-    x_sk.b[0] &= 248;
-    x_sk.b[31] &= 127;
-    x_sk.b[31] |= 64;
+    x_sk[0] &= 248;
+    x_sk[31] &= 127;
+    x_sk[31] |= 64;
 
     /* When given nullptr, `eval` uses the X25519 base point on the elliptic curve */
-    Curve25519::eval(x_pk.b.data(), x_sk.b.data(), nullptr);
+    Curve25519::eval(x_pk, x_sk, nullptr);
 
-    return {m_sk, x_sk, m_pk, x_pk};
+    free(expanded);
 }
 
 /**
  * Generates an XWING key pair using secure random bytes.
- *
- * @return A tuple containing (secret_key, public_key) for XWING operations
  */
-std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair(void)
+int xwing_generate_keypair(uint8_t *secret_key, uint8_t *public_key)
 {
-    XWingSecretKey xwing_sk;
-    XWingPublicKey xwing_pk;
-    XSecretKey x_sk;
-    XPublicKey x_pk;
-    MSecretKey m_sk;
-    MPublicKey m_pk;
+    uint8_t *m_sk = (uint8_t *)malloc(M_SK_BYTES);
+    uint8_t *x_sk = (uint8_t *)malloc(X_SK_BYTES);
+    uint8_t *m_pk = (uint8_t *)malloc(M_PK_BYTES);
+    uint8_t *x_pk = (uint8_t *)malloc(X_PK_BYTES);
 
-    randombytes(xwing_sk.b.data(), XWING_SK_BYTES);
-    std::tie(m_sk, x_sk, m_pk, x_pk) = expand_decapsulation_key(xwing_sk);
+    if (!m_sk || !x_sk || !m_pk || !x_pk) {
+        free(m_sk);
+        free(x_sk);
+        free(m_pk);
+        free(x_pk);
+        return -1;
+    }
 
-    auto it = std::copy(m_pk.b.begin(), m_pk.b.end(), xwing_pk.b.begin());
-    std::copy(x_pk.b.begin(), x_pk.b.end(), it);
+    randombytes(secret_key, XWING_SK_BYTES);
 
-    return {xwing_sk, xwing_pk};
+    xwing_expand_decapsulation_key(secret_key, m_sk, x_sk, m_pk, x_pk);
+
+    // Combine ML-KEM and X25519 public keys
+    memcpy(public_key, m_pk, M_PK_BYTES);
+    memcpy(public_key + M_PK_BYTES, x_pk, X_PK_BYTES);
+
+    free(m_sk);
+    free(x_sk);
+    free(m_pk);
+    free(x_pk);
+
+    return 0;
+}
+
+/**
+ * Generate an XWing keypair deterministically from seed
+ */
+int xwing_generate_keypair_derand(uint8_t *secret_key, uint8_t *public_key)
+{
+    uint8_t *m_sk = (uint8_t *)malloc(M_SK_BYTES);
+    uint8_t *x_sk = (uint8_t *)malloc(X_SK_BYTES);
+    uint8_t *m_pk = (uint8_t *)malloc(M_PK_BYTES);
+    uint8_t *x_pk = (uint8_t *)malloc(X_PK_BYTES);
+
+    if (!m_sk || !x_sk || !m_pk || !x_pk) {
+        free(m_sk);
+        free(x_sk);
+        free(m_pk);
+        free(x_pk);
+        return -1;
+    }
+
+    xwing_expand_decapsulation_key(secret_key, m_sk, x_sk, m_pk, x_pk);
+
+    // Combine ML-KEM and X25519 public keys
+    memcpy(public_key, m_pk, M_PK_BYTES);
+    memcpy(public_key + M_PK_BYTES, x_pk, X_PK_BYTES);
+
+    free(m_sk);
+    free(x_sk);
+    free(m_pk);
+    free(x_pk);
+    return 0;
 }
 
 /**
  * Combines ML-KEM-768 and X25519 shared secrets with domain separation.
- *
- * @param m_ss ML-KEM-768 shared secret
- * @param x_ss X25519 shared secret
- * @param x_ct X25519 ciphertext
- * @param x_pk X25519 public key
- * @return The final XWING shared secret
  */
-XWingSharedSecret combiner(const MSharedSecret &m_ss, const XSharedSecret &x_ss, const XCipherText &x_ct, const XPublicKey &x_pk)
+void xwing_combiner(uint8_t *xwing_ss, const uint8_t *m_ss, const uint8_t *x_ss, const uint8_t *x_ct, const uint8_t *x_pk)
 {
-    XWingSharedSecret xwing_ss;
-    std::array<uint8_t, COMBINED_BYTES> buf;
+    uint8_t *buf = (uint8_t *)malloc(COMBINED_BYTES);
+    if (!buf)
+        return;
 
-    auto it = buf.begin();
+    uint8_t *ptr = buf;
+    memcpy(ptr, m_ss, M_SS_BYTES);
+    ptr += M_SS_BYTES;
+    memcpy(ptr, x_ss, X_SS_BYTES);
+    ptr += X_SS_BYTES;
+    memcpy(ptr, x_ct, X_CT_BYTES);
+    ptr += X_CT_BYTES;
+    memcpy(ptr, x_pk, X_PK_BYTES);
+    ptr += X_PK_BYTES;
+    memcpy(ptr, XWING_LABEL, XWING_LABEL_BYTES);
 
-    it = std::copy(m_ss.b.begin(), m_ss.b.end(), it);
-    it = std::copy(x_ss.b.begin(), x_ss.b.end(), it);
-    it = std::copy(x_ct.b.begin(), x_ct.b.end(), it);
-    it = std::copy(x_pk.b.begin(), x_pk.b.end(), it);
-    std::copy(XWING_LABEL, XWING_LABEL + XWING_LABEL_BYTES, it);
-
-    sha3_256(xwing_ss.b.data(), buf.data(), buf.size());
-
-    return xwing_ss;
+    sha3_256(xwing_ss, buf, COMBINED_BYTES);
+    free(buf);
 }
 
 /**
- * Encapsulates a shared secret using an XWING public key.
- *
- * @param xwing_pk The XWING public key to encapsulate against
- * @return A tuple containing (shared_secret, ciphertext) for the recipient
+ * Encapsulate a shared secret
  */
-std::tuple<XWingSharedSecret, XWingCipherText> encapsulate(const XWingPublicKey &xwing_pk)
+int xwing_encapsulate(uint8_t *ciphertext, uint8_t *shared_secret, const uint8_t *public_key)
 {
-    MPublicKey m_pk;
-    XPublicKey x_pk;
-    XCipherText x_ct;
-    XSharedSecret x_ss;
-    MSharedSecret m_ss;
-    MCipherText m_ct;
-    XWingSharedSecret xwing_ss;
-    XWingCipherText xwing_ct;
-    std::array<uint8_t, 32> ek_x;
+    uint8_t *m_pk = (uint8_t *)malloc(M_PK_BYTES);
+    uint8_t *x_pk = (uint8_t *)malloc(X_PK_BYTES);
+    uint8_t *x_ct = (uint8_t *)malloc(X_CT_BYTES);
+    uint8_t *x_ss = (uint8_t *)malloc(X_SS_BYTES);
+    uint8_t *m_ss = (uint8_t *)malloc(M_SS_BYTES);
+    uint8_t *m_ct = (uint8_t *)malloc(M_CT_BYTES);
+    uint8_t *ek_x = (uint8_t *)malloc(32);
 
-    randombytes(ek_x.data(), 32);
+    if (!m_pk || !x_pk || !x_ct || !x_ss || !m_ss || !m_ct || !ek_x) {
+        free(m_pk);
+        free(x_pk);
+        free(x_ct);
+        free(x_ss);
+        free(m_ss);
+        free(m_ct);
+        free(ek_x);
+        return -1;
+    }
+
+    randombytes(ek_x, 32);
 
     /* Apply X25519 scalar clamping as per RFC 7748 */
     ek_x[0] &= 248;
     ek_x[31] &= 127;
     ek_x[31] |= 64;
 
-    std::copy(xwing_pk.b.begin(), xwing_pk.b.begin() + M_PK_BYTES, m_pk.b.begin());
-    std::copy(xwing_pk.b.begin() + M_PK_BYTES, xwing_pk.b.begin() + M_PK_BYTES + X_PK_BYTES, x_pk.b.begin());
+    memcpy(m_pk, public_key, M_PK_BYTES);
+    memcpy(x_pk, public_key + M_PK_BYTES, X_PK_BYTES);
 
-    /* As before, setting the second point to nullptr uses X22519_BASE implicity
-     */
-    Curve25519::eval(x_ct.b.data(), ek_x.data(), nullptr);
-    Curve25519::eval(x_ss.b.data(), ek_x.data(), x_pk.b.data());
+    /* As before, setting the second point to nullptr uses X25519_BASE implicitly */
+    Curve25519::eval(x_ct, ek_x, nullptr);
+    Curve25519::eval(x_ss, ek_x, x_pk);
 
-    PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc(m_ct.b.data(), m_ss.b.data(), m_pk.b.data());
+    PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc(m_ct, m_ss, m_pk);
 
-    xwing_ss = combiner(m_ss, x_ss, x_ct, x_pk);
+    xwing_combiner(shared_secret, m_ss, x_ss, x_ct, x_pk);
 
     /* Concat operation */
-    auto it = std::copy(m_ct.b.begin(), m_ct.b.end(), xwing_ct.b.begin());
-    std::copy(x_ct.b.begin(), x_ct.b.end(), it);
+    memcpy(ciphertext, m_ct, M_CT_BYTES);
+    memcpy(ciphertext + M_CT_BYTES, x_ct, X_CT_BYTES);
 
-    return {xwing_ss, xwing_ct};
+    free(m_pk);
+    free(x_pk);
+    free(x_ct);
+    free(x_ss);
+    free(m_ss);
+    free(m_ct);
+    free(ek_x);
+    return 0;
 }
 
 /**
- * Encapsulates a shared secret using an XWING public key.
- *
- * @param xwing_pk The XWING public key to encapsulate against
- * @return A tuple containing (shared_secret, ciphertext) for the recipient
+ * Encapsulate a shared secret deterministically
  */
-std::tuple<XWingSharedSecret, XWingCipherText> encapsulate_derand(const XWingPublicKey &xwing_pk, std::array<uint8_t, 64> &eseed)
+int xwing_encapsulate_derand(uint8_t *ciphertext, uint8_t *shared_secret, const uint8_t *public_key, const uint8_t *eseed)
 {
-    MPublicKey m_pk;
-    XPublicKey x_pk;
-    XCipherText x_ct;
-    XSharedSecret x_ss;
-    MSharedSecret m_ss;
-    MCipherText m_ct;
-    XWingSharedSecret xwing_ss;
-    XWingCipherText xwing_ct;
+    uint8_t *m_pk = (uint8_t *)malloc(M_PK_BYTES);
+    uint8_t *x_pk = (uint8_t *)malloc(X_PK_BYTES);
+    uint8_t *x_ct = (uint8_t *)malloc(X_CT_BYTES);
+    uint8_t *x_ss = (uint8_t *)malloc(X_SS_BYTES);
+    uint8_t *m_ss = (uint8_t *)malloc(M_SS_BYTES);
+    uint8_t *m_ct = (uint8_t *)malloc(M_CT_BYTES);
+    uint8_t *ek_X = (uint8_t *)malloc(32);
+    uint8_t *ek_M = (uint8_t *)malloc(32);
 
-    std::array<uint8_t, 32> ek_X;
-    std::array<uint8_t, 32> ek_M;
-    std::copy(eseed.begin(), eseed.begin() + 32, ek_M.begin());
-    std::copy(eseed.begin() + 32, eseed.end(), ek_X.begin());
+    if (!m_pk || !x_pk || !x_ct || !x_ss || !m_ss || !m_ct || !ek_X || !ek_M) {
+        free(m_pk);
+        free(x_pk);
+        free(x_ct);
+        free(x_ss);
+        free(m_ss);
+        free(m_ct);
+        free(ek_X);
+        free(ek_M);
+        return -1;
+    }
+
+    memcpy(ek_M, eseed, 32);
+    memcpy(ek_X, eseed + 32, 32);
 
     /* Apply X25519 scalar clamping as per RFC 7748 */
     ek_X[0] &= 248;
     ek_X[31] &= 127;
     ek_X[31] |= 64;
 
-    std::copy(xwing_pk.b.begin(), xwing_pk.b.begin() + M_PK_BYTES, m_pk.b.begin());
-    std::copy(xwing_pk.b.begin() + M_PK_BYTES, xwing_pk.b.begin() + M_PK_BYTES + X_PK_BYTES, x_pk.b.begin());
+    memcpy(m_pk, public_key, M_PK_BYTES);
+    memcpy(x_pk, public_key + M_PK_BYTES, X_PK_BYTES);
 
-    /* As before, setting the second point to nullptr uses X22519_BASE implicity */
-    Curve25519::eval(x_ct.b.data(), ek_X.data(), nullptr);
-    Curve25519::eval(x_ss.b.data(), ek_X.data(), x_pk.b.data());
+    /* As before, setting the second point to nullptr uses X25519_BASE implicitly */
+    Curve25519::eval(x_ct, ek_X, nullptr);
+    Curve25519::eval(x_ss, ek_X, x_pk);
 
-    PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc_derand(m_ct.b.data(), m_ss.b.data(), m_pk.b.data(), ek_M.data());
+    PQCLEAN_MLKEM768_CLEAN_crypto_kem_enc_derand(m_ct, m_ss, m_pk, ek_M);
 
-    xwing_ss = combiner(m_ss, x_ss, x_ct, x_pk);
+    xwing_combiner(shared_secret, m_ss, x_ss, x_ct, x_pk);
 
     /* Concat operation */
-    auto it = std::copy(m_ct.b.begin(), m_ct.b.end(), xwing_ct.b.begin());
-    std::copy(x_ct.b.begin(), x_ct.b.end(), it);
+    memcpy(ciphertext, m_ct, M_CT_BYTES);
+    memcpy(ciphertext + M_CT_BYTES, x_ct, X_CT_BYTES);
 
-    return {xwing_ss, xwing_ct};
+    free(m_pk);
+    free(x_pk);
+    free(x_ct);
+    free(x_ss);
+    free(m_ss);
+    free(m_ct);
+    free(ek_X);
+    free(ek_M);
+    return 0;
 }
 
 /**
- * Decapsulates a shared secret using an XWING secret key and ciphertext.
- *
- * @param xwing_ct The XWING ciphertext to decapsulate
- * @param xwing_sk The XWING secret key for decapsulation
- * @return The shared secret that matches the encapsulator's output
+ * Decapsulate a shared secret
  */
-XWingSharedSecret decapsulate(const XWingCipherText &xwing_ct, const XWingSecretKey &xwing_sk)
+int xwing_decapsulate(uint8_t *shared_secret, const uint8_t *ciphertext, const uint8_t *secret_key)
 {
-    MSecretKey m_sk;
-    XSecretKey x_sk;
-    MPublicKey m_pk;
-    XPublicKey x_pk;
-    MCipherText m_ct;
-    XCipherText x_ct;
-    MSharedSecret m_ss;
-    XSharedSecret x_ss;
+    uint8_t *m_ct = (uint8_t *)malloc(M_CT_BYTES);
+    uint8_t *x_ct = (uint8_t *)malloc(X_CT_BYTES);
+    uint8_t *m_ss = (uint8_t *)malloc(M_SS_BYTES);
+    uint8_t *x_ss = (uint8_t *)malloc(X_SS_BYTES);
+    uint8_t *m_sk = (uint8_t *)malloc(M_SK_BYTES);
+    uint8_t *x_sk = (uint8_t *)malloc(X_SK_BYTES);
+    uint8_t *m_pk = (uint8_t *)malloc(M_PK_BYTES);
+    uint8_t *x_pk = (uint8_t *)malloc(X_PK_BYTES);
 
-    std::tie(m_sk, x_sk, m_pk, x_pk) = expand_decapsulation_key(xwing_sk);
+    if (!m_ct || !x_ct || !m_ss || !x_ss || !m_sk || !x_sk || !m_pk || !x_pk) {
+        free(m_ct);
+        free(x_ct);
+        free(m_ss);
+        free(x_ss);
+        free(m_sk);
+        free(x_sk);
+        free(m_pk);
+        free(x_pk);
+        return -1;
+    }
 
-    std::copy(xwing_ct.b.begin(), xwing_ct.b.begin() + M_CT_BYTES, m_ct.b.begin());
-    std::copy(xwing_ct.b.begin() + M_CT_BYTES, xwing_ct.b.begin() + M_CT_BYTES + X_CT_BYTES, x_ct.b.begin());
+    xwing_expand_decapsulation_key(secret_key, m_sk, x_sk, m_pk, x_pk);
 
-    PQCLEAN_MLKEM768_CLEAN_crypto_kem_dec(m_ss.b.data(), m_ct.b.data(), m_sk.b.data());
+    memcpy(m_ct, ciphertext, M_CT_BYTES);
+    memcpy(x_ct, ciphertext + M_CT_BYTES, X_CT_BYTES);
 
-    Curve25519::eval(x_ss.b.data(), x_sk.b.data(), x_ct.b.data());
+    PQCLEAN_MLKEM768_CLEAN_crypto_kem_dec(m_ss, m_ct, m_sk);
 
-    return combiner(m_ss, x_ss, x_ct, x_pk);
+    Curve25519::eval(x_ss, x_sk, x_ct);
+
+    xwing_combiner(shared_secret, m_ss, x_ss, x_ct, x_pk);
+
+    free(m_ct);
+    free(x_ct);
+    free(m_ss);
+    free(x_ss);
+    free(m_sk);
+    free(x_sk);
+    free(m_pk);
+    free(x_pk);
+    return 0;
 }
-
-/**
- * Generates an XWING key pair deterministically from a given secret key seed.
- *
- * @warning This function should only be used for testing. Production code
- * should use generate_key_pair() which provides proper entropy.
- *
- * @param xwing_sk The 32-byte secret key seed to use for key generation
- * @return A tuple containing (secret_key, public_key) derived from the seed
- */
-std::tuple<XWingSecretKey, XWingPublicKey> generate_key_pair_derand(const XWingSecretKey &xwing_sk)
-{
-    XWingPublicKey xwing_pk;
-    XSecretKey x_sk;
-    XPublicKey x_pk;
-    MSecretKey m_sk;
-    MPublicKey m_pk;
-
-    std::tie(m_sk, x_sk, m_pk, x_pk) = expand_decapsulation_key(xwing_sk);
-
-    auto it = std::copy(m_pk.b.begin(), m_pk.b.end(), xwing_pk.b.begin());
-    std::copy(x_pk.b.begin(), x_pk.b.end(), it);
-
-    return {xwing_sk, xwing_pk};
-}
-} // namespace XWing
