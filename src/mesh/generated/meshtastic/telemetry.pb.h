@@ -93,7 +93,9 @@ typedef enum _meshtastic_TelemetrySensorType {
     /* PCT2075 Temperature Sensor */
     meshtastic_TelemetrySensorType_PCT2075 = 39,
     /* ADS1X15 ADC */
-    meshtastic_TelemetrySensorType_ADS1X15 = 40
+    meshtastic_TelemetrySensorType_ADS1X15 = 40,
+    /* TRNG */
+    meshtastic_TelemetrySensorType_TRNG = 41,
 } meshtastic_TelemetrySensorType;
 
 /* Struct definitions */
@@ -398,8 +400,8 @@ extern "C" {
 
 /* Helper constants for enums */
 #define _meshtastic_TelemetrySensorType_MIN meshtastic_TelemetrySensorType_SENSOR_UNSET
-#define _meshtastic_TelemetrySensorType_MAX meshtastic_TelemetrySensorType_ADS1X15
-#define _meshtastic_TelemetrySensorType_ARRAYSIZE ((meshtastic_TelemetrySensorType)(meshtastic_TelemetrySensorType_ADS1X15+1))
+#define _meshtastic_TelemetrySensorType_MAX meshtastic_TelemetrySensorType_TRNG
+#define _meshtastic_TelemetrySensorType_ARRAYSIZE ((meshtastic_TelemetrySensorType)(meshtastic_TelemetrySensorType_TRNG+1))
 
 
 

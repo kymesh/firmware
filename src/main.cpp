@@ -40,6 +40,10 @@
 #include <memory>
 #include <utility>
 
+#if !MESHTASTIC_EXCLUDE_TRNG && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
+#include "modules/Telemetry/Sensor/TRNGNoiseSensor.h"
+#endif
+
 #ifdef ARCH_ESP32
 #include "freertosinc.h"
 #if !MESHTASTIC_EXCLUDE_WEBSERVER
@@ -303,6 +307,13 @@ void initializeRNG()
     nRFCrypto.Random.generate(hwEntropy, sizeof(hwEntropy));
     RNG.stir(hwEntropy, sizeof(hwEntropy));
     nRFCrypto.end();
+#endif
+
+#ifndef MESHTASTIC_EXCLUDE_TRNG
+    RNG.begin(optstr(APP_ENV));
+    /* Add TRNG noise sensor as entropy source */
+    TRNGNoiseSensor trngSensor;
+    trngSensor.setup();
 #endif
 
     LOG_DEBUG("RNG initialized with platform entropy");
