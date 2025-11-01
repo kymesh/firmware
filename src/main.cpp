@@ -287,9 +287,7 @@ __attribute__((weak, noinline)) bool loopCanSleep()
 void lateInitVariant() __attribute__((weak));
 void lateInitVariant() {}
 
-/**
- * Print info as a structured log message (for automated log processing)
- */
+static TRNGNoiseSensor trngSensor;
 void initializeRNG()
 {
     /* Initialize with application tag */
@@ -310,15 +308,16 @@ void initializeRNG()
 #endif
 
 #ifndef MESHTASTIC_EXCLUDE_TRNG
-    RNG.begin(optstr(APP_ENV));
     /* Add TRNG noise sensor as entropy source */
-    TRNGNoiseSensor trngSensor;
     trngSensor.setup();
 #endif
 
     LOG_DEBUG("RNG initialized with platform entropy");
 }
 
+/**
+ * Print info as a structured log message (for automated log processing)
+ */
 void printInfo()
 {
     LOG_INFO("S:B:%d,%s,%s,%s", HW_VENDOR, optstr(APP_VERSION), optstr(APP_ENV), optstr(APP_REPO));

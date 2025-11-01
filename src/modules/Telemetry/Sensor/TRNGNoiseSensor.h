@@ -7,16 +7,24 @@ class TRNGNoiseSensor : public TelemetrySensor, public NoiseSource
 {
   private:
     uint8_t analogPin;
-    uint32_t noiseValue;
+    uint8_t noiseBuffer[48];
+    uint32_t counter;
+
+    void sample_noise(uint8_t *buf, size_t len);
+    void add_entropy();
+    void init_entropy_pool();
+    void extract_entropy();
+    void cleanup();
     
   public:
     TRNGNoiseSensor();
+    ~TRNGNoiseSensor();
     virtual void setup() override;
     virtual int32_t runOnce() override;
     virtual bool getMetrics(meshtastic_Telemetry *measurement) override;
 
     // NoiseSource interface
-    void stir() override;   // called by RNG to pull entropy
-    void added() override;  // optional, called when added to RNG
+    void stir() override;
+    void added() override;
     bool calibrating() const override;
 };
